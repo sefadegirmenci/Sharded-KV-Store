@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package sockets;
+
+message master_msg {
+  enum OPERATION{
+    CLIENT_LOCATE = 0; // client requests the location of the server
+    SERVER_JOIN = 1;   // server requests to join the cluster
+    RESPONSE_LOCATE = 2; // master responds with the location of the server
+  }
+
+  required OPERATION operation = 1;
+  optional int32 key = 2; // key from client to master to find the responsible server
+  optional int32 server_port = 3; // server port from server to master
+  optional int32 port = 4; //port of the server from master to client 
+}
