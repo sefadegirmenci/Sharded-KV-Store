@@ -56,6 +56,7 @@ int connect_socket(const char *hostname, const int port)
 
     return sockfd;
 }
+
 int accept_connection(int sockfd)
 {
     struct sockaddr_in cli_addr;
@@ -236,18 +237,27 @@ int main(int argc, char *argv[])
             std::cout << "Received GET request for key " << request.key() << std::endl;
             std::string value;
             rocksdb::Status status = db->Get(rocksdb::ReadOptions(), std::to_string(request.key()), &value);
-            assert(status.ok());
-            std::cout << "Value for key " << request.key() << " is " << value << std::endl;
-            response.set_value(value);
+            if(status.ok()){
+                response.set_value(value);
+                response.set_success(true);
+                std::cout << "Value for key " << request.key() << " is " << value << std::endl;
+            }
+            else{
+                response.set_success(false);
+            }
         }
         else if (request.operation() == server::server_msg::PUT)
         {
             std::cout << "Received PUT request for key " << request.key() << std::endl;
             rocksdb::Status status = db->Put(rocksdb::WriteOptions(), std::to_string(request.key()), request.value());
-            assert(status.ok());
-            response.set_value("");
+            if(status.ok()){
+                response.set_success(true);
+            }
+            else{
+                response.set_success(false);
+            }
         }
-        response.set_success(true);
+        
 
         /* Sending the response to the client. */
         std::string response_str;
