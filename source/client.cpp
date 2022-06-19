@@ -138,7 +138,6 @@ int main(int argc, char *argv[])
     {
         /* Client socket */
         int sockfd;
-        std::cout << "Client is not directly connected to the server" << std::endl;
         /* Connecting the socket to the master. */
         sockfd = connect_socket(hostname, master_port);
         if (sockfd < 0)
@@ -233,23 +232,11 @@ int main(int argc, char *argv[])
     auto size = bytecount;
     std::string response_message(buffer.get(), size);
     response.ParseFromString(response_message);
-    if (response.operation() == server::server_msg::GET)
-    {
-        std::cout << "Value of key " << response.key() << " is " << response.value() << std::endl;
-    }
-    else if (response.operation() == server::server_msg::PUT)
-    {
-        std::cout << "Value of key " << response.key() << " is " << response.value() << std::endl;
-    }
-    else
-    {
-        std::cout << "Invalid operation" << std::endl;
-    }
 
     if(response.success() == false)
     {
         std::cout << "Error in the server" << std::endl;
-        return 1;
+        return 2;
     }
 
     /* Closing the socket. */
