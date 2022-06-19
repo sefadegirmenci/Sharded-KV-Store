@@ -11,5 +11,5 @@ message server_msg{
   required Operation operation = 1;
   required int32 key = 2;
   optional string value = 3;
-  required boolean success = 4; // whether the request was successful from server to client
+  required bool success = 4; // whether the request was successful from server to client
 }
