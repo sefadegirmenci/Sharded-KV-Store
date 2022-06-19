@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 
         /* Send the proto message */
         std::string str;
-        msg->SerializeToString(&str);
+        msg.SerializeToString(&str);
         auto msg_size = str.size();
         auto buf = std::make_unique<char[]>(msg_size + length_size_field);
         construct_message(buf.get(), str.c_str(), msg_size);
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
         auto [bytecount, buffer] = secure_recv(sockfd);
         if(bytecount <=0){
             std::cout<<"Error receiving message"<<std::endl;
-            break;
+            return 1;
         }
         //std::cout<<"Received a message with size "<<bytecount << std::endl;
         if (buffer == nullptr || bytecount == 0) {
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 
     /* Send the proto message */
     std::string server_str;
-    server_msg->SerializeToString(&server_str);
+    server_msg.SerializeToString(&server_str);
     auto msg_size = server_str.size();
     auto buf = std::make_unique<char[]>(msg_size + length_size_field);
     construct_message(buf.get(), server_str.c_str(), msg_size);
@@ -195,10 +195,10 @@ int main(int argc, char *argv[])
     std::string response_message(buffer.get(), size);
     response.ParseFromString(response_message);
     if(response.operation() == server::server_msg::GET) {
-        std::cout<<"Value of key "<<response.key<<" is "<<response.value()<<std::endl;
+        std::cout<<"Value of key "<<response.key()<<" is "<<response.value()<<std::endl;
     }
     else if(response.operation() == server::server_msg::PUT) {
-        std::cout<<"Value of key "<<response.key<<" is "<<response.value()<<std::endl;
+        std::cout<<"Value of key "<<response.key()<<" is "<<response.value()<<std::endl;
     }
     else {
         std::cout<<"Invalid operation"<<std::endl;
