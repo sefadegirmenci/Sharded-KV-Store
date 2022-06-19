@@ -246,6 +246,12 @@ int main(int argc, char *argv[])
         std::cout << "Invalid operation" << std::endl;
     }
 
+    if(response.success() == false)
+    {
+        std::cout << "Error in the server" << std::endl;
+        return 1;
+    }
+
     /* Closing the socket. */
     close(serverfd);
     return 0;
