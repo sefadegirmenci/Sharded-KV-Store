@@ -104,7 +104,7 @@ int main(int args, char *argv[])
     master_msg.set_server_port(port);
     /* Send the join message */
     std::string join_str;
-    master_msg->SerializeToString(&join_str);
+    master_msg.SerializeToString(&join_str);
     auto msg_size = join_str.size();
     auto buf = std::make_unique<char[]>(msg_size + length_size_field);
     construct_message(buf.get(), join_str.c_str(), msg_size);
