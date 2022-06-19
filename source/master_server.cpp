@@ -47,27 +47,6 @@ int shard(int key){
 
 int main(int args, char *argv[])
 {
-    /* Creating a local KV store. */
-    rocksdb::DB *db;
-    rocksdb::Options opts;
-    // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
-    opts.IncreaseParallelism();
-    opts.OptimizeLevelStyleCompaction();
-    // create the DB if it's not already present
-    opts.create_if_missing = true;
-    opts.compression_per_level.resize(opts.num_levels);
-    #if 1
-        for(int i=0;i<opts.num_levels;i++)
-        {
-            opts.compression_per_level[i] = rocksdb::kNoCompression;
-        }
-    #endif
-    opts.compression = kNoCompression;
-
-    rocksdb::Status status = rocksdb::DB::Open(opts, "./testdb", &db);
-    
-    assert(status.ok());
-
     /* This is parsing the command line arguments. */
     cxxopts::Options options(argv[0], "Sever for the sockets benchmark");
     options.allow_unrecognised_options().add_options()(
