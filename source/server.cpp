@@ -136,8 +136,8 @@ int main(int argc, char *argv[])
     }
 #endif
     opts.compression = rocksdb::kNoCompression;
-
-    rocksdb::Status status = rocksdb::DB::Open(opts, "./testdb", &db);
+    std::string db_path = "./db" + std::to_string(getpid());
+    rocksdb::Status status = rocksdb::DB::Open(opts, db_path, &db);
 
     assert(status.ok());
 
@@ -252,9 +252,11 @@ int main(int argc, char *argv[])
             rocksdb::Status status = db->Put(rocksdb::WriteOptions(), std::to_string(request.key()), request.value());
             if(status.ok()){
                 response.set_success(true);
+                std::cout << "Operation is successful" << std::endl;
             }
             else{
                 response.set_success(false);
+                std::cout << "Operation is unsuccessful" << std::endl;
             }
         }
         

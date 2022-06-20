@@ -14,6 +14,7 @@
 #include <fstream>
 #include <fmt/core.h>
 #include "message.h"
+#include <sys/select.h>
 #include "shared.h"
 #include "workload_traces/generate_traces.h"
 #include <google/protobuf/io/coded_stream.h>
@@ -128,69 +129,97 @@ int main(int argc, char *argv[])
         error("Error creating socket");
     }
 
-    /* This is accepting the connections */
-    int newsockfd = accept_connection(sockfd);
-    if (newsockfd < 0)
-    {
-        error("Error accepting connection.");
-    }
-    std::cout << "Accepted a connection" << std::endl;
-    /* This is the main loop of the server. */
-    while (newsockfd != -1)
-    {
-        /* This is reading the message. */
-        auto [bytecount, buffer] = secure_recv(newsockfd);
-        if (bytecount <= 0)
-        {
-            std::cout << "Error receiving message" << std::endl;
-            break;
-        }
-        // std::cout<<"Received a message with size "<<bytecount << std::endl;
-        if (buffer == nullptr || bytecount == 0)
-        {
-            return 1;
-        }
-        /* Parsing the message from the buffer */
-        sockets::master_msg request;
-        auto size = bytecount;
-        std::string master_message(buffer.get(), size);
-        request.ParseFromString(master_message);
-        // std::cout<<"Message is "<<master_message.DebugString()<<std::endl;
+    fd_set current_sockets, ready_sockets;
+    FD_ZERO(&current_sockets);
+    FD_SET(sockfd, &current_sockets);
 
-        /* This is handling the message. */
-        if (request.operation() == sockets::master_msg::SERVER_JOIN)
+    struct timeval tv;
+    tv.tv_sec = 4;
+    tv.tv_usec = 0;
+
+    while (true)
+    {
+        ready_sockets = current_sockets;
+        if (select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL) < 0)
         {
-            cluster.push_back(request.server_port());
+            error("Error in select");
         }
-        else if (request.operation() == sockets::master_msg::CLIENT_LOCATE)
+        for (int i = 0; i < FD_SETSIZE; i++)
         {
-            if (cluster.size() == 0)
+            if (FD_ISSET(i, &ready_sockets))
             {
-                std::cout << "No servers are running" << std::endl;
-                return 1;
-            }
-            int shard_id = shard(request.key());
+                if (i == sockfd)
+                {
 
-            auto cluster_front = cluster.begin();
-            std::advance(cluster_front, shard_id - 1);
-            int server_port = *cluster_front;
-            sockets::master_msg response;
-            response.set_operation(sockets::master_msg::RESPONSE_LOCATE);
-            response.set_port(server_port);
-            std::string response_message;
-            response.SerializeToString(&response_message);
-            auto response_size = response_message.size();
-            auto response_buffer = std::make_unique<char[]>(response_size + length_size_field);
-            construct_message(response_buffer.get(), response_message.c_str(), response_size);
-            secure_send(newsockfd, response_buffer.get(), response_size + length_size_field);
+                    // this is a new connection we can accept
+                    int newsockfd = accept_connection(sockfd);
+                    if (newsockfd < 0)
+                    {
+                        error("Error accepting connection.");
+                    }
+
+                    std::cout << "Accepted a connection" << std::endl;
+                    FD_SET(newsockfd, &current_sockets);
+                }
+                else
+                {
+                    /* This is reading the message. */
+                    auto [bytecount, buffer] = secure_recv(i);
+                    if (bytecount <= 0)
+                    {
+                        std::cout << "Error receiving message" << std::endl;
+                        break;
+                    }
+                    // std::cout<<"Received a message with size "<<bytecount << std::endl;
+                    if (buffer == nullptr || bytecount == 0)
+                    {
+                        return 1;
+                    }
+                    /* Parsing the message from the buffer */
+                    sockets::master_msg request;
+                    auto size = bytecount;
+                    std::string master_message(buffer.get(), size);
+                    request.ParseFromString(master_message);
+                    // std::cout<<"Message is "<<master_message.DebugString()<<std::endl;
+
+                    /* This is handling the message. */
+                    if (request.operation() == sockets::master_msg::SERVER_JOIN)
+                    {
+                        cluster.push_back(request.server_port());
+                        std::cout<<"Server joined with port "<<request.server_port()<<std::endl;
+                    }
+                    else if (request.operation() == sockets::master_msg::CLIENT_LOCATE)
+                    {
+                        std::cout<<"Client requested a server with key "<<request.key()<<std::endl;
+                        if (cluster.size() == 0)
+                        {
+                            std::cout << "No servers are running" << std::endl;
+                            return 1;
+                        }
+                        int shard_id = shard(request.key());
+                        std::cout<<"Shard id for this key is "<<shard_id<<std::endl;
+                        auto cluster_front = cluster.begin();
+                        std::advance(cluster_front, shard_id - 1);
+                        int server_port = *cluster_front;
+                        std::cout<<"Client will be directed to server with port "<<server_port<<std::endl;
+                        sockets::master_msg response;
+                        response.set_operation(sockets::master_msg::RESPONSE_LOCATE);
+                        response.set_port(server_port);
+                        std::string response_message;
+                        response.SerializeToString(&response_message);
+                        auto response_size = response_message.size();
+                        auto response_buffer = std::make_unique<char[]>(response_size + length_size_field);
+                        construct_message(response_buffer.get(), response_message.c_str(), response_size);
+                        secure_send(i, response_buffer.get(), response_size + length_size_field);
+                    }
+                    FD_CLR(i, &current_sockets);
+                }
+            }
         }
-        /* Accepting a connection. */
-        newsockfd = accept_connection(sockfd);
     }
 
-    /* Closing the sockets. */
-    close(newsockfd);
-    close(sockfd);
+        /* Closing the sockets. */
+        close(sockfd);
 
-    return 0;
-}
+        return 0;
+    }
