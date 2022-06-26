@@ -11,5 +11,6 @@ message server_msg{
   required Operation operation = 1;
   required int32 key = 2;
   optional string value = 3;
-  optional bool success = 4; // whether the request was successful from server to client
+  optional bool key_exists = 4; // true if key exists in the server from the GET request
+  optional bool success = 5; // whether the request was successful from server to client
 }
