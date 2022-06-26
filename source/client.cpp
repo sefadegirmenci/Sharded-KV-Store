@@ -233,10 +233,15 @@ int main(int argc, char *argv[])
     std::string response_message(buffer.get(), size);
     response.ParseFromString(response_message);
 
+    if(response.key_exists() == false) {
+        std::cout << "Key does not exist" << std::endl;
+        return 2;
+    }
+
     if(response.success() == false)
     {
         std::cout << "Error in the server" << std::endl;
-        return 2;
+        return 1;
     }
 
     /* Closing the socket. */
