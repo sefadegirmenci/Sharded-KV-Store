@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
         server::server_msg response;
         response.set_operation(request.operation());
         response.set_key(request.key());
-
+        response.set_key_exists(true); // assume key exists, make it false if not found in get request
         if (request.operation() == server::server_msg::GET)
         {
             std::cout << "Received GET request for key " << request.key() << std::endl;
@@ -243,6 +243,7 @@ int main(int argc, char *argv[])
                 std::cout << "Value for key " << request.key() << " is " << value << std::endl;
             }
             else{
+                response.set_key_exists(false);
                 response.set_success(false);
             }
         }
@@ -258,6 +259,10 @@ int main(int argc, char *argv[])
                 response.set_success(false);
                 std::cout << "Operation is unsuccessful" << std::endl;
             }
+        }
+        else
+        {
+            response.set_success(false);
         }
         
 
