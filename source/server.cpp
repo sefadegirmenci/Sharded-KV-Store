@@ -97,7 +97,12 @@ int main(int argc, char *argv[])
     master_msg.set_operation(sockets::master_msg::SERVER_JOIN);
     master_msg.set_server_port(port);
     /* Send the join message */
-    send_proto_message(masterfd,master_msg);
+    std::string join_str;
+    master_msg.SerializeToString(&join_str);
+    auto msg_size = join_str.size();
+    auto buf = std::make_unique<char[]>(msg_size + length_size_field);
+    construct_message(buf.get(), join_str.c_str(), msg_size);
+    secure_send(masterfd, buf.get(), msg_size + length_size_field);
     
 
     
