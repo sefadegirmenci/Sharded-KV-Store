@@ -60,14 +60,6 @@ int listening_socket(int port)
     return sockfd;
 }
 
-void send_proto_message(int fd, auto msg){
-    std::string join_str;
-    msg.SerializeToString(&join_str);
-    auto msg_size = join_str.size();
-    auto buf = std::make_unique<char[]>(msg_size + length_size_field);
-    construct_message(buf.get(), join_str.c_str(), msg_size);
-    secure_send(fd, buf.get(), msg_size + length_size_field);
-}
 
 int connect_socket(const char *hostname, const int port)
 {
@@ -95,7 +87,7 @@ int connect_socket(const char *hostname, const int port)
     /* Connecting the socket to the server. */
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        perror("ERROR connecting in connect_socket\n");
+        
         return -1;
     }
 
