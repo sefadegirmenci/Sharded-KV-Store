@@ -25,38 +25,6 @@ const char *hostname = "localhost";
 
 std::atomic<int64_t> number{0};
 
-int connect_socket(const char *hostname, const int port)
-{
-    struct sockaddr_in serv_addr;
-    struct hostent *server = gethostbyname(hostname);
-    if (server == NULL)
-    {
-        perror("No such host");
-        return -1;
-    }
-
-    /* Creating a socket and then checking if it was created successfully. */
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        perror("ERROR opening socket in connect_socket\n");
-        return -1;
-    }
-    /* Setting the socket address. */
-    bzero((char *)&serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
-    serv_addr.sin_port = htons(port);
-    /* Connecting the socket to the server. */
-    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-        perror("ERROR connecting in connect_socket\n");
-        return -1;
-    }
-
-    return sockfd;
-}
-
 int accept_connection(int sockfd)
 {
     struct sockaddr_in cli_addr;
@@ -227,7 +195,8 @@ int main(int argc, char *argv[])
         request.ParseFromString(server_message);
         // std::cout<<"Message is "<<server_message.DebugString()<<std::endl;
         /* Get the port from proto message */
-
+        std::cout << "Received a message with operation "
+                  << request.operation() << std::endl;
         server::server_msg response;
         response.set_operation(request.operation());
         response.set_key(request.key());
@@ -237,12 +206,14 @@ int main(int argc, char *argv[])
             std::cout << "Received GET request for key " << request.key() << std::endl;
             std::string value;
             rocksdb::Status status = db->Get(rocksdb::ReadOptions(), std::to_string(request.key()), &value);
-            if(status.ok()){
+            if (status.ok())
+            {
                 response.set_value(value);
                 response.set_success(true);
                 std::cout << "Value for key " << request.key() << " is " << value << std::endl;
             }
-            else{
+            else
+            {
                 response.set_key_exists(false);
                 response.set_success(false);
             }
@@ -251,11 +222,28 @@ int main(int argc, char *argv[])
         {
             std::cout << "Received PUT request for key " << request.key() << std::endl;
             rocksdb::Status status = db->Put(rocksdb::WriteOptions(), std::to_string(request.key()), request.value());
-            if(status.ok()){
+            if (status.ok())
+            {
                 response.set_success(true);
                 std::cout << "Operation is successful" << std::endl;
             }
-            else{
+            else
+            {
+                response.set_success(false);
+                std::cout << "Operation is unsuccessful" << std::endl;
+            }
+        }
+        else if (request.operation() == server::server_msg::DELETE)
+        {
+            std::cout << "Received DELETE request for key " << request.key() << std::endl;
+            rocksdb::Status status = db->Delete(rocksdb::WriteOptions(), std::to_string(request.key()));
+            if (status.ok())
+            {
+                response.set_success(true);
+                std::cout << "Operation is successful" << std::endl;
+            }
+            else
+            {
                 response.set_success(false);
                 std::cout << "Operation is unsuccessful" << std::endl;
             }
@@ -264,16 +252,19 @@ int main(int argc, char *argv[])
         {
             response.set_success(false);
         }
-        
+        /* Delete comes from the master and does not require a response */
+        if (request.operation() != server::server_msg::DELETE)
+        {
+            /* Sending the response to the client. */
+            std::string response_str;
+            response.SerializeToString(&response_str);
+            auto msg_size = response_str.size();
+            auto buf = std::make_unique<char[]>(msg_size + length_size_field);
+            construct_message(buf.get(), response_str.c_str(), msg_size);
+            secure_send(newsockfd, buf.get(), msg_size + length_size_field);
+            std::cout << "Sent response to client" << std::endl;
+        }
 
-        /* Sending the response to the client. */
-        std::string response_str;
-        response.SerializeToString(&response_str);
-        auto msg_size = response_str.size();
-        auto buf = std::make_unique<char[]>(msg_size + length_size_field);
-        construct_message(buf.get(), response_str.c_str(), msg_size);
-        secure_send(newsockfd, buf.get(), msg_size + length_size_field);
-        std::cout << "Sent response to client" << std::endl;
         /* Accepting the connection from the client. */
         newsockfd = accept_connection(sockfd);
     }
