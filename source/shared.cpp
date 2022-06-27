@@ -60,6 +60,15 @@ int listening_socket(int port)
     return sockfd;
 }
 
+void send_proto_message(int fd, auto msg){
+    std::string join_str;
+    msg.SerializeToString(&join_str);
+    auto msg_size = join_str.size();
+    auto buf = std::make_unique<char[]>(msg_size + length_size_field);
+    construct_message(buf.get(), join_str.c_str(), msg_size);
+    secure_send(fd, buf.get(), msg_size + length_size_field);
+}
+
 int connect_socket(const char *hostname, const int port)
 {
     struct sockaddr_in serv_addr;
@@ -72,6 +81,11 @@ int connect_socket(const char *hostname, const int port)
 
     /* Creating a socket and then checking if it was created successfully. */
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("Socket failed\n");
+        return -1;
+    }
    
     /* Setting the socket address. */
     bzero((char *)&serv_addr, sizeof(serv_addr));
