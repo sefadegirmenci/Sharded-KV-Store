@@ -35,7 +35,7 @@ int connect_socket(const char *hostname, const int port)
     /* Connecting the socket to the server. */
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        perror("ERROR connecting in connect_socket\n");
+        
         return -1;
     }
 
