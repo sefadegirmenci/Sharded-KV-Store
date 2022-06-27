@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
                     if (request.operation() == sockets::master_msg::SERVER_JOIN)
                     {
                         /* There is a need for redistribution */
-                        if (cluster.size() > 0 && keys.size() > 1)
+                        if (cluster.size() > 0)
                         {
                             for (auto key : keys)
                             {
