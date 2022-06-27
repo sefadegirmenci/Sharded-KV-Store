@@ -129,10 +129,8 @@ int main(int argc, char *argv[])
         auto [bytecount, buffer] = secure_recv(sockfd);
         if (bytecount <= 0)
         {
-            std::cout << "Error receiving message" << std::endl;
             return 1;
         }
-        // std::cout<<"Received a message with size "<<bytecount << std::endl;
         if (buffer == nullptr || bytecount == 0)
         {
             return 1;
@@ -142,10 +140,8 @@ int main(int argc, char *argv[])
         auto size = bytecount;
         std::string master_message(buffer.get(), size);
         response.ParseFromString(master_message);
-        // std::cout<<"Message is "<<master_message.DebugString()<<std::endl;
         /* Get the port from proto message */
         port = response.port();
-        // std::cout<<"Server port is "<<server_port<<std::endl;
         close(sockfd);
     }
 
@@ -171,7 +167,6 @@ int main(int argc, char *argv[])
     }
     else
     {
-        std::cout << "Invalid operation" << std::endl;
         return 1;
     }
 
@@ -187,7 +182,6 @@ int main(int argc, char *argv[])
     auto [bytecount, buffer] = secure_recv(serverfd);
     if (bytecount <= 0)
     {
-        std::cout << "Error receiving message" << std::endl;
         return 1;
     }
 
@@ -201,17 +195,15 @@ int main(int argc, char *argv[])
     std::string response_message(buffer.get(), size);
     response.ParseFromString(response_message);
 
-    if(response.key_exists() == false) {
-        std::cout << "Key does not exist" << std::endl;
+    if (response.key_exists() == false)
+    {
         return 2;
     }
 
-    if(response.success() == false)
+    if (response.success() == false)
     {
-        std::cout << "Error in the server" << std::endl;
         return 1;
     }
-    std::cout << "Value of key is " << response.value() << std::endl;
     /* Closing the socket. */
     close(serverfd);
     return 0;
