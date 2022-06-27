@@ -6,6 +6,7 @@ message server_msg{
   enum Operation {
     GET = 1;
     PUT = 2;
+    DELETE = 3;
   }
 
   required Operation operation = 1;

@@ -1,5 +1,6 @@
 syntax = "proto2";
 
+// The name of the file is client_message because of the build reasons but this proto is for master
 package sockets;
 
 message master_msg {
