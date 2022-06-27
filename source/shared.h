@@ -130,3 +130,5 @@ inline void construct_message(char *dst, const char *payload,
 }
 
 int connect_socket(const char *hostname, const int port);
+int listening_socket(int port);
+int accept_connection(int listening_socket);

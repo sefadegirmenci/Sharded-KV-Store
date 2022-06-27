@@ -10,6 +10,56 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+int accept_connection(int sockfd)
+{
+    struct sockaddr_in cli_addr;
+    socklen_t clilen = sizeof(cli_addr);
+    int newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+    if (newsockfd < 0)
+    {
+        return -1;
+    }
+    return newsockfd;
+}
+
+int listening_socket(int port)
+{
+    /* Creating a socket. */
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0)
+    {
+        perror("Socket failed\n");
+        return -1;
+    }
+
+    /* sockaddr_in gives the internet address */
+    struct sockaddr_in serv_addr;
+
+    /* Setting the socket address. */
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(port);
+
+    /* Setting the socket options. */
+    int enable = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+        perror("setsockopt(SO_REUSEADDR) failed");
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        perror("Binding failed\n");
+        return -1;
+    }
+
+    /* Listening for incoming connections. */
+    if (listen(sockfd, 1) < 0)
+    {
+        return -1;
+    }
+    return sockfd;
+}
+
 int connect_socket(const char *hostname, const int port)
 {
     struct sockaddr_in serv_addr;
@@ -22,11 +72,7 @@ int connect_socket(const char *hostname, const int port)
 
     /* Creating a socket and then checking if it was created successfully. */
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        perror("ERROR opening socket in connect_socket\n");
-        return -1;
-    }
+   
     /* Setting the socket address. */
     bzero((char *)&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -35,7 +81,7 @@ int connect_socket(const char *hostname, const int port)
     /* Connecting the socket to the server. */
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        
+        perror("ERROR connecting in connect_socket\n");
         return -1;
     }
 
