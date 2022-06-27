@@ -29,55 +29,6 @@ std::list<int> keys;    /* This stores the keys */
 
 std::atomic<int64_t> number{0};
 
-int accept_connection(int sockfd)
-{
-    struct sockaddr_in cli_addr;
-    socklen_t clilen = sizeof(cli_addr);
-    int newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-    if (newsockfd < 0)
-    {
-        return -1;
-    }
-    return newsockfd;
-}
-
-int listening_socket(int port)
-{
-    /* Creating a socket. */
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (sockfd < 0)
-    {
-        perror("Socket failed\n");
-        return -1;
-    }
-
-    /* sockaddr_in gives the internet address */
-    struct sockaddr_in serv_addr;
-
-    /* Setting the socket address. */
-    bzero((char *)&serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
-
-    /* Setting the socket options. */
-    int enable = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
-        perror("setsockopt(SO_REUSEADDR) failed");
-    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-        perror("Binding failed\n");
-        return -1;
-    }
-
-    /* Listening for incoming connections. */
-    if (listen(sockfd, 1) < 0)
-    {
-        return -1;
-    }
-    return sockfd;
-}
 
 /**
  * It prints an error message and exits the program
@@ -151,15 +102,12 @@ int main(int argc, char *argv[])
             {
                 if (i == sockfd)
                 {
-
                     // this is a new connection we can accept
                     int newsockfd = accept_connection(sockfd);
                     if (newsockfd < 0)
                     {
                         error("Error accepting connection.");
                     }
-
-                    std::cout << "Accepted a connection" << std::endl;
                     FD_SET(newsockfd, &current_sockets);
                 }
                 else
@@ -168,10 +116,8 @@ int main(int argc, char *argv[])
                     auto [bytecount, buffer] = secure_recv(i);
                     if (bytecount <= 0)
                     {
-                        std::cout << "Error receiving message" << std::endl;
                         break;
                     }
-                    // std::cout<<"Received a message with size "<<bytecount << std::endl;
                     if (buffer == nullptr || bytecount == 0)
                     {
                         return 1;
@@ -181,8 +127,6 @@ int main(int argc, char *argv[])
                     auto size = bytecount;
                     std::string master_message(buffer.get(), size);
                     request.ParseFromString(master_message);
-                    // std::cout<<"Message is "<<master_message.DebugString()<<std::endl;
-
                     /* This is handling the message. */
                     if (request.operation() == sockets::master_msg::SERVER_JOIN)
                     {
@@ -215,7 +159,6 @@ int main(int argc, char *argv[])
                                 auto [bytecount, buffer] = secure_recv(serverfd);
                                 if (bytecount <= 0)
                                 {
-                                    std::cout << "Error receiving message" << std::endl;
                                     return 1;
                                 }
 
@@ -229,8 +172,6 @@ int main(int argc, char *argv[])
                                 std::string response_message(buffer.get(), size);
                                 response.ParseFromString(response_message);
                                 std::string value = response.value();
-
-                                std::cout << "Sending delete request for key " << key <<std::endl;
                                 /* Send delete request to the server */
                                 serverfd = connect_socket(hostname, server_port);
                                 server_msg.set_operation(server::server_msg::DELETE);
@@ -264,24 +205,21 @@ int main(int argc, char *argv[])
                             }
                         }
                         cluster.push_back(request.server_port());
-                        std::cout << "Server joined with port " << request.server_port() << std::endl;
+                        
                     }
                     else if (request.operation() == sockets::master_msg::CLIENT_LOCATE)
                     {
-                        std::cout << "Client requested a server with key " << request.key() << std::endl;
                         if (cluster.size() == 0)
                         {
-                            std::cout << "No servers are running" << std::endl;
                             return 1;
                         }
                         int shard_id = find_shard(request.key());
                         keys.push_back(request.key());
 
-                        std::cout << "Shard id for this key is " << shard_id << std::endl;
                         auto cluster_front = cluster.begin();
                         std::advance(cluster_front, shard_id - 1);
                         int server_port = *cluster_front;
-                        std::cout << "Client will be directed to server with port " << server_port << std::endl;
+                        
                         sockets::master_msg response;
                         response.set_operation(sockets::master_msg::RESPONSE_LOCATE);
                         response.set_port(server_port);
