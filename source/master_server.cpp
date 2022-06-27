@@ -24,7 +24,8 @@
 #include <list>
 
 const char *hostname = "localhost";
-std::list<int> cluster;
+std::list<int> cluster; /* This stores the port number of the shards */
+std::list<int> keys;    /* This stores the keys */
 
 std::atomic<int64_t> number{0};
 
@@ -89,7 +90,7 @@ void error(const char *msg)
     exit(0);
 }
 
-int shard(int key)
+int find_shard(int key)
 {
     int num_servers = cluster.size();
     int shard_id = (key % num_servers) + 1;
@@ -185,23 +186,102 @@ int main(int argc, char *argv[])
                     /* This is handling the message. */
                     if (request.operation() == sockets::master_msg::SERVER_JOIN)
                     {
+                        /* There is a need for redistribution */
+                        if (cluster.size() > 0 && keys.size() > 1)
+                        {
+                            for (auto key : keys)
+                            {
+                                int shard_id = find_shard(key);
+                                auto cluster_front = cluster.begin();
+                                std::advance(cluster_front, shard_id - 1);
+                                int server_port = *cluster_front;
+                                int serverfd = connect_socket(hostname, server_port);
+                                if (serverfd < 0)
+                                {
+                                    error("Error connecting to server");
+                                }
+                                /* Get the value of key from server */
+                                server::server_msg server_msg;
+                                server_msg.set_operation(server::server_msg::GET);
+                                server_msg.set_key(key);
+                                /* Send the proto message */
+                                std::string server_str;
+                                server_msg.SerializeToString(&server_str);
+                                auto msg_size = server_str.size();
+                                auto buf = std::make_unique<char[]>(msg_size + length_size_field);
+                                construct_message(buf.get(), server_str.c_str(), msg_size);
+                                secure_send(serverfd, buf.get(), msg_size + length_size_field);
+                                /* Receive the response from the server */
+                                auto [bytecount, buffer] = secure_recv(serverfd);
+                                if (bytecount <= 0)
+                                {
+                                    std::cout << "Error receiving message" << std::endl;
+                                    return 1;
+                                }
+
+                                if (buffer == nullptr || bytecount == 0)
+                                {
+                                    return 1;
+                                }
+                                /* Parsing the message from the buffer */
+                                server::server_msg response;
+                                auto size = bytecount;
+                                std::string response_message(buffer.get(), size);
+                                response.ParseFromString(response_message);
+                                std::string value = response.value();
+
+                                std::cout << "Sending delete request for key " << key <<std::endl;
+                                /* Send delete request to the server */
+                                serverfd = connect_socket(hostname, server_port);
+                                server_msg.set_operation(server::server_msg::DELETE);
+                                server_msg.set_key(key);
+                                /* Send the proto message */
+                                server_str.clear();
+                                server_msg.SerializeToString(&server_str);
+                                msg_size = server_str.size();
+                                buf = std::make_unique<char[]>(msg_size + length_size_field);
+                                construct_message(buf.get(), server_str.c_str(), msg_size);
+                                secure_send(serverfd, buf.get(), msg_size + length_size_field);
+
+                                /* Send put request to the correct server */
+                                cluster.push_back(request.server_port());
+                                shard_id = find_shard(key);
+                                cluster_front = cluster.begin();
+                                std::advance(cluster_front, shard_id - 1);
+                                server_port = *cluster_front;
+                                serverfd = connect_socket(hostname, server_port);
+                                cluster.pop_back();
+                                server_msg.set_operation(server::server_msg::PUT);
+                                server_msg.set_key(key);
+                                server_msg.set_value(value);
+                                /* Send the proto message */
+                                server_str.clear();
+                                server_msg.SerializeToString(&server_str);
+                                msg_size = server_str.size();
+                                buf = std::make_unique<char[]>(msg_size + length_size_field);
+                                construct_message(buf.get(), server_str.c_str(), msg_size);
+                                secure_send(serverfd, buf.get(), msg_size + length_size_field);
+                            }
+                        }
                         cluster.push_back(request.server_port());
-                        std::cout<<"Server joined with port "<<request.server_port()<<std::endl;
+                        std::cout << "Server joined with port " << request.server_port() << std::endl;
                     }
                     else if (request.operation() == sockets::master_msg::CLIENT_LOCATE)
                     {
-                        std::cout<<"Client requested a server with key "<<request.key()<<std::endl;
+                        std::cout << "Client requested a server with key " << request.key() << std::endl;
                         if (cluster.size() == 0)
                         {
                             std::cout << "No servers are running" << std::endl;
                             return 1;
                         }
-                        int shard_id = shard(request.key());
-                        std::cout<<"Shard id for this key is "<<shard_id<<std::endl;
+                        int shard_id = find_shard(request.key());
+                        keys.push_back(request.key());
+
+                        std::cout << "Shard id for this key is " << shard_id << std::endl;
                         auto cluster_front = cluster.begin();
                         std::advance(cluster_front, shard_id - 1);
                         int server_port = *cluster_front;
-                        std::cout<<"Client will be directed to server with port "<<server_port<<std::endl;
+                        std::cout << "Client will be directed to server with port " << server_port << std::endl;
                         sockets::master_msg response;
                         response.set_operation(sockets::master_msg::RESPONSE_LOCATE);
                         response.set_port(server_port);
@@ -218,8 +298,8 @@ int main(int argc, char *argv[])
         }
     }
 
-        /* Closing the sockets. */
-        close(sockfd);
+    /* Closing the sockets. */
+    close(sockfd);
 
-        return 0;
-    }
+    return 0;
+}
