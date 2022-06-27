@@ -10,6 +10,38 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+int connect_socket(const char *hostname, const int port)
+{
+    struct sockaddr_in serv_addr;
+    struct hostent *server = gethostbyname(hostname);
+    if (server == NULL)
+    {
+        perror("No such host");
+        return -1;
+    }
+
+    /* Creating a socket and then checking if it was created successfully. */
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0)
+    {
+        perror("ERROR opening socket in connect_socket\n");
+        return -1;
+    }
+    /* Setting the socket address. */
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+    serv_addr.sin_port = htons(port);
+    /* Connecting the socket to the server. */
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        perror("ERROR connecting in connect_socket\n");
+        return -1;
+    }
+
+    return sockfd;
+}
+
 inline auto destruct_message(char *msg, size_t bytes)
     -> std::optional<uint32_t> {
   if (bytes < 4) {

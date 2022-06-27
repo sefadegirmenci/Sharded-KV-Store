@@ -128,3 +128,5 @@ inline void construct_message(char *dst, const char *payload,
   convert_int_to_byte_array(dst, payload_size);
   ::memcpy(dst + length_size_field, payload, payload_size);
 }
+
+int connect_socket(const char *hostname, const int port);
